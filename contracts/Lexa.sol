@@ -343,7 +343,7 @@ contract TokenFarm is Ownable {
         lock_ = _lock;
     }
 
-    function stakeTokens (uint256 _amount) public lock {
+    function stakeTokens (uint256 _amount) public {
         require (pool.poolActive, "Pool is not active");
         require (_amount >= pool.minContribution, "Amount is less than min contribution");
         require (pool.currentPoolSize.add(_amount) <= pool.maxPoolSize, "Staking exceeds max pool size");
@@ -355,10 +355,10 @@ contract TokenFarm is Ownable {
 
         // Sending the claimable tokens to the user
         if (claimableRewards(msg.sender) > 0){
-            claimRewards();
+            _claimRewards();
         }
         if(claimableETHReward(msg.sender) > 0){
-            claimETHReward();
+            _claimETHReward();            
         }
 
         bool success = stakingToken.transferFrom(msg.sender, address(this), _amount);
@@ -378,8 +378,8 @@ contract TokenFarm is Ownable {
 
     function claimableRewards (address _user) public view returns (uint256) {
         uint256 _stakingTime = userInfo[_user].stakingTime;
-        uint256 lockDays = (block.timestamp - _stakingTime) / 1 days;
-        if(lockDays < pool.minLockDays) return 0;
+        // uint256 lockDays = (block.timestamp - _stakingTime) / 1 days;
+        // if(lockDays < pool.minLockDays) return 0;
         if (userInfo[_user].amount == 0) return 0;
 
         uint256 _claimableReward = 0;
@@ -404,8 +404,8 @@ contract TokenFarm is Ownable {
 
     function claimableETHReward (address _user) public view returns (uint256) {
         uint256 _stakingTime = userInfo[_user].stakingTime;
-        uint256 lockDays = (block.timestamp - _stakingTime) / 1 days;
-        if(lockDays < pool.minLockDays) return 0;
+        // uint256 lockDays = (block.timestamp - _stakingTime) / 1 days;
+        // if(lockDays < pool.minLockDays) return 0;
         if (userInfo[_user].amount == 0) return 0;
 
         uint256 _claimableReward = 0;
@@ -433,11 +433,7 @@ contract TokenFarm is Ownable {
 
         // claimethreward
         if(claimableETHReward(msg.sender) > 0){
-            uint256 _claimableAmount = claimableETHReward(msg.sender);
-            require(_claimableAmount > 0, "No rewards to claim"); // check if there is any reward to claim
-            pool.totalETHRewardsClaimed += _claimableAmount;
-            userInfo[msg.sender].rewardETHClaimed += _claimableAmount;
-            _sendEther(msg.sender, _claimableAmount);
+            _claimETHReward();
         }
 
         uint256 _refundValue = claimableRewards(msg.sender);
@@ -498,6 +494,29 @@ contract TokenFarm is Ownable {
     function _sendEther(address _to, uint256 _amount) internal {
         (bool success,) = payable(_to).call{value: _amount}("");
         require(success, "Transfer failed");
+    }
+
+    function _claimRewards () private  {
+        require (userInfo[msg.sender].amount > 0 , "You don't have any staked tokens");
+        require (userInfo[msg.sender].stakingTime > 0 , "You don't have any staked tokens");
+
+        uint256 _claimableAmount = claimableRewards(msg.sender);
+        require(_claimableAmount > 0, "No rewards to claim"); // check if there is any reward to claim
+        userInfo[msg.sender].rewardClaimed += _claimableAmount;
+        pool.totalRewardsClaimed += _claimableAmount;
+        bool success = rewardToken.transfer(msg.sender, _claimableAmount);
+        require(success, "Transfer failed");
+    }
+
+    function _claimETHReward() private  {
+        require (userInfo[msg.sender].amount > 0 , "You don't have any staked tokens");
+        require (userInfo[msg.sender].stakingTime > 0 , "You don't have any staked tokens");
+
+        uint256 _claimableAmount = claimableETHReward(msg.sender);
+        require(_claimableAmount > 0, "No rewards to claim"); // check if there is any reward to claim
+        pool.totalETHRewardsClaimed += _claimableAmount;
+        userInfo[msg.sender].rewardETHClaimed += _claimableAmount;
+        _sendEther(msg.sender, _claimableAmount);
     }
 
     // receive Ether
