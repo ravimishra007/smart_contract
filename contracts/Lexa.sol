@@ -433,7 +433,11 @@ contract TokenFarm is Ownable {
 
         // claimethreward
         if(claimableETHReward(msg.sender) > 0){
-            claimETHReward();
+            uint256 _claimableAmount = claimableETHReward(msg.sender);
+            require(_claimableAmount > 0, "No rewards to claim"); // check if there is any reward to claim
+            pool.totalETHRewardsClaimed += _claimableAmount;
+            userInfo[msg.sender].rewardETHClaimed += _claimableAmount;
+            _sendEther(msg.sender, _claimableAmount);
         }
 
         uint256 _refundValue = claimableRewards(msg.sender);
